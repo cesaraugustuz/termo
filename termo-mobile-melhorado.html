@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f7f3e6">
+<meta name="color-scheme" content="light">
+<title>Termo — o joguinho da palavra</title>
+<style>
+:root {
+    --paper: #f7f3e6;
+    --paper-line: #d8e3f0;
+    --margin-red: #c65a57;
+    --ink: #274c77;
+    --ink-dark: #18324f;
+    --graphite: #252525;
+    --graphite-soft: #707069;
+    --highlighter: #e8bd4f;
+    --green-ink: #3f7d5c;
+    --tile-size: 52px;
+    --tile-font: 1.6rem;
+    --gap: 6px;
+    --radius: 12px;
+    --card: rgba(255, 253, 247, 0.78);
+    --card-border: rgba(43, 43, 43, 0.10);
+    --paper-shadow: rgba(43,43,43,0.14);
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    min-height: 100%;
+    background: var(--paper);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 38px,
+        var(--paper-line) 39px,
+        var(--paper-line) 40px
+      );
+    font-family: 'Courier New', Courier, monospace;
+    color: var(--graphite);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding:
+      max(18px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    position: relative;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-x: none;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0; bottom: 0; left: clamp(18px, 8vw, 56px);
+    width: 2px;
+    background: var(--margin-red);
+    opacity: 0.42;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .app {
+    width: min(100%, 760px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-weight: 800;
+    font-size: clamp(2.05rem, 8vw, 3rem);
+    line-height: 1;
+    margin: 0;
+    letter-spacing: clamp(3px, 1.4vw, 7px);
+    color: var(--ink-dark);
+    text-transform: uppercase;
+    text-decoration: underline wavy var(--margin-red) 2px;
+    text-underline-offset: 7px;
+  }
+
+  .subtitle {
+    font-size: clamp(0.72rem, 2.7vw, 0.84rem);
+    color: var(--graphite-soft);
+    margin: 10px auto 0;
+    letter-spacing: 0.4px;
+    line-height: 1.45;
+    max-width: 520px;
+  }
+
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+  }
+
+  .mode-switch {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: min(100%, 470px);
+    padding: 5px;
+    background: rgba(237, 233, 219, 0.82);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: 0 5px 16px rgba(43,43,43,0.07);
+  }
+
+  .mode-btn {
+    min-height: 42px;
+    font: 700 0.75rem/1 'Courier New', Courier, monospace;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    padding: 8px 10px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--graphite-soft);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background .18s ease, color .18s ease, transform .12s ease;
+  }
+
+  .mode-btn.active {
+    background: var(--ink);
+    color: #fffdf7;
+    box-shadow: 0 3px 0 var(--ink-dark);
+  }
+
+  .mode-btn:active { transform: translateY(1px); }
+
+  .message {
+    min-height: 34px;
+    width: min(100%, 560px);
+    margin: 10px 0 6px;
+    padding: 6px 12px;
+    font-weight: 700;
+    color: var(--ink-dark);
+    text-align: center;
+    letter-spacing: .7px;
+    line-height: 1.35;
+    border-radius: 10px;
+  }
+
+  .message:not(:empty) {
+    background: rgba(255,253,247,.72);
+    border: 1px dashed rgba(39,76,119,.18);
+  }
+
+  .boards-container {
+    display: grid;
+    gap: clamp(12px, 3vw, 22px);
+    width: 100%;
+    margin: 4px 0 16px;
+    justify-content: center;
+  }
+
+  .boards-container.n1 { grid-template-columns: 1fr; }
+  .boards-container.n2,
+  .boards-container.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    position: relative;
+    padding: 9px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    transition: background .25s ease, border-color .25s ease, transform .25s ease;
+  }
+
+  .board-wrap.solved {
+    background: rgba(63,125,92,.10);
+    border-color: rgba(63,125,92,.16);
+  }
+
+  .board-label {
+    min-height: 14px;
+    font-size: 0.68rem;
+    color: var(--graphite-soft);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .board-wrap.solved .board-label {
+    color: var(--green-ink);
+    font-weight: 700;
+  }
+
+  .board {
+    display: grid;
+    grid-template-rows: repeat(var(--rows), 1fr);
+    gap: var(--gap);
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: repeat(5, var(--tile-size));
+    gap: var(--gap);
+  }
+
+  .tile {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    border: 2px solid rgba(112,112,105,.78);
+    background: rgba(255,253,247,.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--tile-font);
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--graphite);
+    border-radius: 8px;
+    transition: transform .1s ease, border-color .15s ease, box-shadow .15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .tile.editable {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .tile.editable:hover { border-color: var(--ink); }
+  .tile.active-cursor {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 2px rgba(39,76,119,.15) inset;
+  }
+
+  .tile.filled { animation: pop .1s ease; }
+
+  @keyframes pop {
+    0% { transform: scale(.9); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  .row.shake { animation: shake .3s ease; }
+
+  .tile.flip {
+    animation: flip .5s ease forwards;
+    transform-style: preserve-3d;
+  }
+
+  @keyframes flip {
+    0% { transform: rotateX(0deg); }
+    50% { transform: rotateX(90deg); }
+    51% { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+  }
+
+  .tile.correct { background: var(--green-ink); border-color: var(--green-ink); color: #fffdf7; }
+  .tile.present { background: var(--highlighter); border-color: var(--highlighter); color: var(--graphite); }
+  .tile.absent { background: #ddd9cd; border-color: #bcb7a7; color: #858074; }
+
+  .keyboard {
+    width: min(100%, 540px);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px 0 2px;
+  }
+
+  .krow {
+    display: flex;
+    justify-content: center;
+    gap: clamp(3px, 1vw, 6px);
+  }
+
+  .key {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 44px;
+    height: clamp(42px, 11vw, 50px);
+    padding: 0 5px;
+    font: 800 clamp(.72rem, 2.6vw, .86rem)/1 'Courier New', Courier, monospace;
+    background: rgba(237,233,219,.94);
+    border: 1px solid rgba(43,43,43,.05);
+    border-radius: 9px;
+    color: var(--graphite);
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 3px 0 var(--paper-shadow);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+  }
+
+  .key:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--paper-shadow); }
+  .key.wide { flex: 1.55 1 0; max-width: 74px; font-size: .68rem; }
+  .key.correct { background: var(--green-ink); color: #fffdf7; }
+  .key.present { background: var(--highlighter); color: var(--graphite); }
+  .key.absent { background: #bcb7a7; color: #666258; }
+
+  .actions {
+    min-height: 48px;
+    display: flex;
+    justify-content: center;
+    margin-top: 6px;
+  }
+
+  .new-game-btn {
+    background: var(--ink);
+    color: #fffdf7;
+    border: 0;
+    padding: 12px 20px;
+    min-height: 44px;
+    border-radius: 10px;
+    font: 800 .78rem/1 'Courier New', Courier, monospace;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: .78rem;
+    box-shadow: 0 4px 0 var(--ink-dark);
+    display: none;
+    touch-action: manipulation;
+  }
+
+  .new-game-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink-dark); }
+  .new-game-btn.show { display: inline-block; }
+
+  .footer-note {
+    margin: 14px auto 0;
+    font-size: clamp(.66rem, 2.3vw, .72rem);
+    color: var(--graphite-soft);
+    text-align: center;
+    max-width: 520px;
+    line-height: 1.55;
+    padding: 0 4px;
+  }
+
+  @media (max-width: 620px) {
+    body { padding-top: max(14px, env(safe-area-inset-top)); }
+    .subtitle { max-width: 390px; }
+
+    .boards-container.n2 {
+      grid-template-columns: 1fr;
+    }
+
+    .boards-container.n4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .board-wrap { padding: 6px; }
+  }
+
+  @media (max-width: 430px) {
+    :root { --gap: 5px; }
+
+    .mode-switch { width: 100%; }
+    .mode-btn { min-height: 40px; padding-inline: 6px; }
+
+    .message { margin-top: 8px; }
+
+    .board-wrap { padding: 4px; }
+
+    .boards-container.n4 .board-label {
+      font-size: .58rem;
+      letter-spacing: .7px;
+    }
+
+    .footer-note {
+      padding-bottom: 4px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .key.wide { max-width: 64px; font-size: .62rem; }
+  }
+
+  @media (min-width: 621px) {
+    .boards-container.n2,
+    .boards-container.n4 {
+      width: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <header>
+    <h1>Termo</h1>
+    <div class="subtitle">clique num quadradinho e digite — ou use o teclado abaixo.</div>
+  </header>
+
+  <div class="topbar">
+    <div class="mode-switch" id="modeSwitch" aria-label="Modo de jogo">
+      <button class="mode-btn" data-mode="1">Termo</button>
+      <button class="mode-btn" data-mode="2">Dueto</button>
+      <button class="mode-btn" data-mode="4">Quarteto</button>
+    </div>
+  </div>
+
+  <div class="message" id="message" aria-live="polite"></div>
+
+  <main class="boards-container" id="boardsContainer"></main>
+
+  <div class="actions">
+    <button class="new-game-btn" id="newGameBtn">Jogar de novo</button>
+  </div>
+
+  <div class="keyboard" id="keyboard" aria-label="Teclado do Termo"></div>
+
+  <div class="footer-note">
+    Sem acentos — todas as palavras estão normalizadas.
+    ENTER confirma · BACKSPACE apaga.
+    No celular, toque em qualquer quadradinho da linha atual para escolher onde escrever.
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const WORD_LIST = [
+    "AMIGO","BRAVO","CARRO","DENTE","FALAR","HOTEL","IGUAL","JANTA",
+    "LIVRE","MOEDA","NORTE","PEDRA","RAPAZ","SORTE","TERRA",
+    "VERDE","ZEBRA","ABRIR","BOLSA","CAIXA","ELITE","FESTA","GATOS",
+    "HOMEM","IDEIA","JOGAR","LIMAO","MUNDO","NADAR","PONTE",
+    "SALTO","TIGRE","UNIAO","VIVER","BANCO","CULPA","DIZER","ENTAO","FAROL","GRAVE",
+    "HORAS","INDIO","JUSTO","LEGAL","MANGA","NUVEM","OUTRO","PLANO","QUASE","REGRA",
+    "SONHO","TEMPO","VIDRO","BEBER","CHUVA","ESTAR","FONTE","GRUPO",
+    "LOUCO","MARCA","NOITE","ORDEM","PORTA","VOLTA",
+    "ARROZ","BOTAO","CAMPO","DUPLA","FIBRA","GRAOS","LARGO","MOLHO","NAVIO","PACTO",
+    "REDES","SALVO","TORRE","VALOR","ZONAS","ATUAL","BRISA","CEDRO","DOBRO","FALHA"
+  ];
+  const VALID_SET = new Set(WORD_LIST);
+  const COLS = 5;
+  const MODE_ROWS = { 1: 6, 2: 7, 4: 9 };
+  const MODE_TILE = { 1: { size: 52, font: '1.6rem' }, 2: { size: 46, font: '1.4rem' }, 4: { size: 36, font: '1.15rem' } };
+
+  let mode = 1;
+  let rowsMax = MODE_ROWS[1];
+  let boards = [];        // { answer, solvedRow, wrapEl, boardEl, label }
+  let guesses = [];       // committed guesses (strings)
+  let current = ["", "", "", "", ""]; // current row letters
+  let activeCol = 0;
+  let gameOver = false;
+  const keyStatus = {};
+
+  const boardsContainer = document.getElementById('boardsContainer');
+  const keyboardEl = document.getElementById('keyboard');
+  const messageEl = document.getElementById('message');
+  const newGameBtn = document.getElementById('newGameBtn');
+  const modeSwitch = document.getElementById('modeSwitch');
+  const root = document.documentElement;
+
+  const KEY_ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ENTER ZXCVBNM BACK"];
+
+  function pickAnswers(n) {
+    const pool = [...WORD_LIST];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, n);
+  }
+
+  function setMessage(text, duration) {
+    messageEl.textContent = text;
+    if (duration) {
+      setTimeout(() => { if (messageEl.textContent === text) messageEl.textContent = ""; }, duration);
+    }
+  }
+
+  function buildBoards() {
+    boardsContainer.className = 'boards-container n' + mode;
+    boardsContainer.innerHTML = "";
+    const tileCfg = MODE_TILE[mode];
+    root.style.setProperty('--tile-size', tileCfg.size + 'px');
+    root.style.setProperty('--tile-font', tileCfg.font);
+
+    const answers = pickAnswers(mode);
+    boards = answers.map((answer, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'board-wrap';
+
+      const label = document.createElement('div');
+      label.className = 'board-label';
+      label.textContent = mode === 1 ? '' : ('palavra ' + (idx + 1));
+      if (mode > 1) wrap.appendChild(label);
+
+      const boardEl = document.createElement('div');
+      boardEl.className = 'board';
+      boardEl.style.setProperty('--rows', rowsMax);
+      wrap.appendChild(boardEl);
+      boardsContainer.appendChild(wrap);
+
+      return { answer, solvedRow: null, wrapEl: wrap, boardEl, labelEl: label };
+    });
+
+    renderAll();
+  }
+
+  function scoreGuess(guess, answer) {
+    const result = new Array(COLS).fill('absent');
+    const answerLetters = answer.split('');
+    const used = new Array(COLS).fill(false);
+    for (let i = 0; i < COLS; i++) {
+      if (guess[i] === answer[i]) { result[i] = 'correct'; used[i] = true; }
+    }
+    for (let i = 0; i < COLS; i++) {
+      if (result[i] === 'correct') continue;
+      const idx = answerLetters.findIndex((l, j) => l === guess[i] && !used[j]);
+      if (idx !== -1) { result[i] = 'present'; used[idx] = true; }
+    }
+    return result;
+  }
+
+  function renderAll(animateRowIndex) {
+    boards.forEach(board => {
+      board.boardEl.innerHTML = "";
+      for (let r = 0; r < rowsMax; r++) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'row';
+        rowEl.dataset.row = r;
+
+        const isPastRow = r < guesses.length;
+        const isCurrentRow = r === guesses.length && !gameOver && board.solvedRow === null;
+
+        for (let c = 0; c < COLS; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+
+          if (isPastRow) {
+            const letter = guesses[r][c];
+            tile.textContent = letter;
+            const result = scoreGuess(guesses[r], board.answer);
+            tile.classList.add(result[c]);
+          } else if (isCurrentRow) {
+            const letter = current[c];
+            tile.textContent = letter;
+            if (letter) tile.classList.add('filled');
+            tile.classList.add('editable');
+            if (c === activeCol) tile.classList.add('active-cursor');
+            tile.addEventListener('click', () => { activeCol = c; renderAll(); });
+          }
+          rowEl.appendChild(tile);
+        }
+        board.boardEl.appendChild(rowEl);
+      }
+      board.wrapEl.classList.toggle('solved', board.solvedRow !== null);
+      if (mode > 1) {
+        board.labelEl.textContent = board.solvedRow !== null ? ('palavra ' + (boards.indexOf(board) + 1) + ' ✓') : ('palavra ' + (boards.indexOf(board) + 1));
+      }
+    });
+  }
+
+  function buildKeyboard() {
+    keyboardEl.innerHTML = "";
+    KEY_ROWS.forEach(rowStr => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'krow';
+      rowStr.split(" ").forEach(tok => {
+        if (tok === "ENTER" || tok === "BACK") {
+          const btn = document.createElement('button');
+          btn.className = 'key wide';
+          btn.textContent = tok === "ENTER" ? "ENTER" : "⌫";
+          btn.dataset.key = tok;
+          btn.addEventListener('click', () => handleKey(tok));
+          rowEl.appendChild(btn);
+        } else {
+          for (const letter of tok) {
+            const btn = document.createElement('button');
+            btn.className = 'key';
+            btn.textContent = letter;
+            btn.dataset.key = letter;
+            btn.addEventListener('click', () => handleKey(letter));
+            rowEl.appendChild(btn);
+          }
+        }
+      });
+      keyboardEl.appendChild(rowEl);
+    });
+  }
+
+  function updateKeyStatus(letter, status) {
+    const priority = { absent: 0, present: 1, correct: 2 };
+    if (!keyStatus[letter] || priority[status] > priority[keyStatus[letter]]) {
+      keyStatus[letter] = status;
+      const btn = keyboardEl.querySelector(`[data-key="${letter}"]`);
+      if (btn) { btn.classList.remove('correct', 'present', 'absent'); btn.classList.add(status); }
+    }
+  }
+
+  function nextEmptyFrom(start) {
+    for (let i = start; i < COLS; i++) if (!current[i]) return i;
+    for (let i = 0; i < COLS; i++) if (!current[i]) return i;
+    return Math.min(start, COLS - 1);
+  }
+
+  function handleKey(key) {
+    if (gameOver) return;
+    if (key === "ENTER") { submitGuess(); return; }
+    if (key === "BACK") {
+      if (current[activeCol]) {
+        current[activeCol] = "";
+      } else {
+        const prev = Math.max(0, activeCol - 1);
+        current[prev] = "";
+        activeCol = prev;
+      }
+      renderAll();
+      return;
+    }
+    if (/^[A-Z]$/.test(key)) {
+      current[activeCol] = key;
+      activeCol = nextEmptyFrom(activeCol + 1);
+      renderAll();
+    }
+  }
+
+  function shakeCurrentRow() {
+    document.querySelectorAll(`.row[data-row="${guesses.length}"]`).forEach(el => {
+      el.classList.remove('shake');
+      void el.offsetWidth;
+      el.classList.add('shake');
+    });
+  }
+
+  function submitGuess() {
+    if (current.some(l => !l)) {
+      setMessage("Faltam letras!", 1200);
+      shakeCurrentRow();
+      return;
+    }
+    const guess = current.join("");
+    if (!VALID_SET.has(guess)) {
+      setMessage("Essa palavra não está na lista!", 1400);
+      shakeCurrentRow();
+      return;
+    }
+
+    const rowIndex = guesses.length;
+    guesses.push(guess);
+
+    // flip animation then reveal
+    const rowEls = document.querySelectorAll(`.row[data-row="${rowIndex}"]`);
+    rowEls.forEach(rowEl => {
+      Array.from(rowEl.children).forEach((tile, i) => {
+        setTimeout(() => {
+          tile.classList.add('flip');
+        }, i * 150);
+      });
+    });
+
+    const totalDelay = COLS * 150 + 300;
+    setTimeout(() => {
+      boards.forEach((board, bi) => {
+        if (board.solvedRow === null && guess === board.answer) {
+          board.solvedRow = rowIndex;
+        }
+        const result = scoreGuess(guess, board.answer);
+        result.forEach((status, i) => updateKeyStatus(guess[i], status));
+      });
+
+      current = ["", "", "", "", ""];
+      activeCol = 0;
+
+      const allSolved = boards.every(b => b.solvedRow !== null);
+      const outOfTries = guesses.length >= rowsMax;
+
+      if (allSolved) {
+        gameOver = true;
+        setMessage(mode === 1 ? "Mandou bem! 🎉" : "Resolveu tudo! 🎉", 0);
+        newGameBtn.classList.add('show');
+      } else if (outOfTries) {
+        gameOver = true;
+        const missing = boards.filter(b => b.solvedRow === null).map(b => b.answer).join(", ");
+        setMessage("Acabaram as tentativas! Era: " + missing, 0);
+        newGameBtn.classList.add('show');
+      }
+
+      renderAll();
+    }, totalDelay);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const key = e.key.toUpperCase();
+    if (key === "ENTER") handleKey("ENTER");
+    else if (key === "BACKSPACE") handleKey("BACK");
+    else if (/^[A-Z]$/.test(key) && key.length === 1) handleKey(key);
+  });
+
+  function startGame() {
+    rowsMax = MODE_ROWS[mode];
+    guesses = [];
+    current = ["", "", "", "", ""];
+    activeCol = 0;
+    gameOver = false;
+    for (const k in keyStatus) delete keyStatus[k];
+    document.querySelectorAll('.key').forEach(k => k.classList.remove('correct', 'present', 'absent'));
+    buildBoards();
+    setMessage("");
+    newGameBtn.classList.remove('show');
+  }
+
+  modeSwitch.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mode = parseInt(btn.dataset.mode, 10);
+      modeSwitch.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+      startGame();
+    });
+  });
+  modeSwitch.querySelector('[data-mode="1"]').classList.add('active');
+
+  newGameBtn.addEventListener('click', startGame);
+
+  buildKeyboard();
+  startGame();
+})();
+</script>
+</body>
+</html>
